@@ -1,5 +1,4 @@
 --[[
-    This is early release source
                           Neverlose.cc UI Library
     Author: 4lpaca
 	License: MIT
@@ -207,392 +206,6 @@ NeverLose.IsMosueOverOtherFrame = false;
 NeverLose.GlobalLogo = "rbxassetid://120358385035996";
 NeverLose.ImageColorMapping = "rbxassetid://4155801252";
 
--- ┌─────────────────────────────────────────────────────────────────┐
--- │                   THEME SYSTEM (AddTheme)                       │
--- └─────────────────────────────────────────────────────────────────┘
-
-NeverLose.Themes = {};
-NeverLose.ThemeCallbacks = {};   -- list of callbacks to update live UI
-
--- Register a theme update listener (internal use)
-function NeverLose:OnThemeChanged(fn)
-	table.insert(NeverLose.ThemeCallbacks, fn);
-end;
-
--- Apply all registered theme callbacks
-local function _ApplyTheme(theme)
-	NeverLose.AccentColor  = theme.Accent      or NeverLose.AccentColor;
-	NeverLose.MainColor    = theme.Background  or NeverLose.MainColor;
-	NeverLose.IconColor    = theme.Icon        or NeverLose.IconColor;
-
-	-- fire every live-update listener
-	for _, fn in next, NeverLose.ThemeCallbacks do
-		pcall(fn, theme);
-	end;
-end;
-
---[[
-	NeverLose:AddTheme({
-		Name        = "Lumi Sakura",
-		Accent      = Color3.fromRGB(255,120,180),
-		Background  = Color3.fromRGB(35,20,30),
-		Surface     = Color3.fromRGB(60,30,50),
-		Outline     = Color3.fromRGB(255,160,200),
-		Text        = Color3.fromRGB(255,220,235),
-		Placeholder = Color3.fromRGB(200,140,170),
-		Button      = Color3.fromRGB(255,140,190),
-		Icon        = Color3.fromRGB(255,180,210),
-	})
-]]
-function NeverLose:AddTheme(Config)
-	Config = Config or {};
-	Config.Name = Config.Name or "Custom Theme";
-
-	-- defaults fall back to current values
-	local theme = {
-		Name        = Config.Name,
-		Accent      = Config.Accent      or NeverLose.AccentColor,
-		Background  = Config.Background  or NeverLose.MainColor,
-		Surface     = Config.Surface     or Color3.fromRGB(20,22,27),
-		Outline     = Config.Outline     or Color3.fromRGB(45,48,58),
-		Text        = Config.Text        or Color3.fromRGB(255,255,255),
-		Placeholder = Config.Placeholder or Color3.fromRGB(140,140,155),
-		Button      = Config.Button      or NeverLose.AccentColor,
-		Icon        = Config.Icon        or NeverLose.IconColor,
-	};
-
-	table.insert(NeverLose.Themes, theme);
-	_ApplyTheme(theme);
-
-	return theme;
-end;
-
--- ┌─────────────────────────────────────────────────────────────────┐
--- │               MENU ICON (CreateMenuIcon)                        │
--- │  • Always center-left of screen                                 │
--- │  • Round-square shape with UICorner                             │
--- │  • Auto-scales with UI scale                                    │
--- │  • Supports rbxassetid, Lucide-style icon name, or image URL    │
--- │  • Cool show/hide animations                                    │
--- │  • Color / BG / Stroke all customisable                         │
--- │  • Cannot be dragged off screen (optional drag entirely)        │
--- └─────────────────────────────────────────────────────────────────┘
-
-function NeverLose:CreateMenuIcon(Config)
-	Config = Config or {};
-
-	-- ── Defaults ──────────────────────────────────────────────────
-	local iconSize       = Config.Size         or 48;
-	local iconImage      = Config.Image        or "";          -- rbxassetid:// OR lucide name OR URL
-	local iconColor      = Config.IconColor    or Color3.fromRGB(255,255,255);
-	local bgColor        = Config.BGColor      or Color3.fromRGB(20,22,27);
-	local strokeColor    = Config.StrokeColor  or NeverLose.AccentColor;
-	local strokeThick    = Config.StrokeThick  or 1.5;
-	local draggable      = (Config.Draggable ~= false);       -- default true, but clamped
-	local cornerRadius   = UDim.new(0, math.floor(iconSize * 0.28)); -- ~28 % → round-square
-
-	-- ── Container ─────────────────────────────────────────────────
-	local IconRoot = Instance.new("Frame");
-	IconRoot.Name             = NeverLose.RandomString();
-	IconRoot.Parent           = NeverLose.ScreenGui;
-	-- center-left: X = 15px from left, Y = 50 % of screen
-	IconRoot.AnchorPoint      = Vector2.new(0, 0.5);
-	IconRoot.BackgroundColor3 = bgColor;
-	IconRoot.BackgroundTransparency = 1;   -- start invisible
-	IconRoot.BorderSizePixel  = 0;
-	IconRoot.Size             = UDim2.fromOffset(iconSize, iconSize);
-	IconRoot.Position         = UDim2.new(0, 15, 0.5, 0);
-	IconRoot.ZIndex           = 20;
-	IconRoot.ClipsDescendants = false;
-
-	local UICornerIcon = Instance.new("UICorner");
-	UICornerIcon.CornerRadius = cornerRadius;
-	UICornerIcon.Parent       = IconRoot;
-
-	-- Stroke
-	local UIStrokeIcon = Instance.new("UIStroke");
-	UIStrokeIcon.Color       = strokeColor;
-	UIStrokeIcon.Thickness   = strokeThick;
-	UIStrokeIcon.Transparency = 1;
-	UIStrokeIcon.Parent      = IconRoot;
-
-	-- ── Icon display (TextLabel for built-in / ImageLabel for image) ──
-	-- We keep both and show the relevant one.
-	local IconLabel = Instance.new("TextLabel");
-	IconLabel.Name                = NeverLose.RandomString();
-	IconLabel.Parent              = IconRoot;
-	IconLabel.AnchorPoint         = Vector2.new(0.5, 0.5);
-	IconLabel.BackgroundTransparency = 1;
-	IconLabel.BorderSizePixel     = 0;
-	IconLabel.Position            = UDim2.fromScale(0.5, 0.5);
-	IconLabel.Size                = UDim2.fromScale(0.65, 0.65);
-	IconLabel.ZIndex              = 21;
-	IconLabel.FontFace            = NeverLose.BuiltInBold;
-	IconLabel.Text                = "";
-	IconLabel.TextColor3          = iconColor;
-	IconLabel.TextScaled          = true;
-	IconLabel.TextTransparency    = 1;
-	IconLabel.TextWrapped         = true;
-
-	local IconImage = Instance.new("ImageLabel");
-	IconImage.Name                = NeverLose.RandomString();
-	IconImage.Parent              = IconRoot;
-	IconImage.AnchorPoint         = Vector2.new(0.5, 0.5);
-	IconImage.BackgroundTransparency = 1;
-	IconImage.BorderSizePixel     = 0;
-	IconImage.Position            = UDim2.fromScale(0.5, 0.5);
-	IconImage.Size                = UDim2.fromScale(0.65, 0.65);
-	IconImage.ZIndex              = 21;
-	IconImage.ImageColor3         = iconColor;
-	IconImage.ImageTransparency   = 1;
-	IconImage.ScaleType           = Enum.ScaleType.Fit;
-
-	local UICornerImg = Instance.new("UICorner");
-	UICornerImg.CornerRadius = UDim.new(0.15, 0);
-	UICornerImg.Parent       = IconImage;
-
-	-- Shadow behind icon
-	local IconShadow = NeverLose:CreateShadow(IconRoot, true);
-
-	-- ── Internal state ────────────────────────────────────────────
-	local MenuIconLib = {
-		Root         = IconRoot,
-		Visible      = false,
-		_size        = iconSize,
-		_draggable   = draggable,
-	};
-
-	-- ── Helpers ───────────────────────────────────────────────────
-	local function _isImageSource(src)
-		-- rbxassetid, https link, or looks like a number (asset id)
-		return src and (
-			string.find(src, "rbxassetid://", 1, true) or
-			string.find(src, "https://", 1, true) or
-			tonumber(src) ~= nil
-		);
-	end;
-
-	local function _applyIcon(src)
-		if not src or src == "" then
-			IconLabel.Text           = "";
-			IconImage.Image          = "";
-			return;
-		end;
-
-		if _isImageSource(src) then
-			-- numeric id → prefix
-			if tonumber(src) then src = "rbxassetid://"..src; end;
-			IconImage.Image      = src;
-			IconImage.Visible    = true;
-			IconLabel.Visible    = false;
-		else
-			-- treat as built-in icon name (Lucide / builder-icons)
-			NeverLose:SetIconMode(IconLabel, src);
-			IconLabel.Visible    = true;
-			IconImage.Visible    = false;
-		end;
-	end;
-
-	_applyIcon(iconImage);
-
-	-- ── Show / Hide with smooth animations ───────────────────────
-	local function _setIconVisible(val)
-		MenuIconLib.Visible = val;
-
-		if val then
-			-- Bounce-in from left
-			IconRoot.Position = UDim2.new(0, -iconSize, 0.5, 0);
-			NeverLose.PlayAnimate(IconRoot, VSlowTween, {
-				BackgroundTransparency = 0,
-				Position = UDim2.new(0, 15, 0.5, 0),
-			});
-			NeverLose.PlayAnimate(UIStrokeIcon, SlowyTween, {
-				Transparency = 0.25,
-			});
-			NeverLose.PlayAnimate(IconLabel, VSlowTween, {
-				TextTransparency = 0,
-			});
-			NeverLose.PlayAnimate(IconImage, VSlowTween, {
-				ImageTransparency = 0,
-			});
-			IconShadow:Render(true);
-		else
-			-- Slide out to the left
-			NeverLose.PlayAnimate(IconRoot, VSlowTween, {
-				BackgroundTransparency = 1,
-				Position = UDim2.new(0, -iconSize - 10, 0.5, 0),
-			});
-			NeverLose.PlayAnimate(UIStrokeIcon, SlowyTween, {
-				Transparency = 1,
-			});
-			NeverLose.PlayAnimate(IconLabel, SlowyTween, {
-				TextTransparency = 1,
-			});
-			NeverLose.PlayAnimate(IconImage, SlowyTween, {
-				ImageTransparency = 1,
-			});
-			IconShadow:Render(false);
-		end;
-	end;
-
-	-- ── Public API ────────────────────────────────────────────────
-
-	--- Show or hide the icon
-	function MenuIconLib:SetVisible(val)
-		_setIconVisible(val);
-	end;
-
-	--- Change the icon image (rbxassetid, URL, or built-in name)
-	function MenuIconLib:SetIcon(src)
-		iconImage = src;
-		_applyIcon(src);
-	end;
-
-	--- Change icon tint colour
-	function MenuIconLib:SetIconColor(c3)
-		iconColor = c3;
-		IconLabel.TextColor3  = c3;
-		IconImage.ImageColor3 = c3;
-	end;
-
-	--- Change background colour
-	function MenuIconLib:SetBGColor(c3)
-		bgColor = c3;
-		IconRoot.BackgroundColor3 = c3;
-	end;
-
-	--- Change stroke colour
-	function MenuIconLib:SetStrokeColor(c3)
-		strokeColor = c3;
-		UIStrokeIcon.Color = c3;
-	end;
-
-	--- Change stroke thickness
-	function MenuIconLib:SetStrokeThick(t)
-		UIStrokeIcon.Thickness = t;
-	end;
-
-	--- Resize the icon (also adjusts corner radius)
-	function MenuIconLib:SetSize(sz)
-		MenuIconLib._size = sz;
-		IconRoot.Size = UDim2.fromOffset(sz, sz);
-		UICornerIcon.CornerRadius = UDim.new(0, math.floor(sz * 0.28));
-	end;
-
-	--- Enable / disable drag
-	function MenuIconLib:SetDraggable(enabled)
-		MenuIconLib._draggable = enabled;
-	end;
-
-	--- React to window toggle (pass true = UI is now visible, false = hidden)
-	function MenuIconLib:OnWindowToggle(windowVisible)
-		-- pulse-scale animation when toggling
-		local sz = MenuIconLib._size;
-		if windowVisible then
-			-- shrink slightly
-			NeverLose.PlayAnimate(IconRoot, TweenInfo.new(0.1), {
-				Size = UDim2.fromOffset(sz * 0.85, sz * 0.85),
-			});
-			task.delay(0.12, function()
-				NeverLose.PlayAnimate(IconRoot, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-					Size = UDim2.fromOffset(sz, sz),
-				});
-			end);
-		else
-			-- expand slightly
-			NeverLose.PlayAnimate(IconRoot, TweenInfo.new(0.1), {
-				Size = UDim2.fromOffset(sz * 1.15, sz * 1.15),
-			});
-			task.delay(0.12, function()
-				NeverLose.PlayAnimate(IconRoot, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-					Size = UDim2.fromOffset(sz, sz),
-				});
-			end);
-		end;
-	end;
-
-	-- ── Optional drag (clamped to screen, never off edge) ─────────
-	do
-		local dragging = false;
-		local dragStart, startPos;
-
-		local function clampPosition(pos)
-			local screenSize = NeverLose.ScreenGui.AbsoluteSize;
-			local sz2 = MenuIconLib._size;
-			local nx = math.clamp(pos.X.Offset, 0, screenSize.X - sz2);
-			local ny = math.clamp(pos.Y.Scale * screenSize.Y + pos.Y.Offset, sz2/2, screenSize.Y - sz2/2);
-			return UDim2.new(0, nx, 0, ny);
-		end;
-
-			-- Tap = toggle UI  |  Drag = move icon (if draggable)
-			-- Uses movement threshold to distinguish a click from a drag.
-			local dragging   = false;
-			local dragStart, startPos;
-			local DRAG_THRESHOLD = 6; -- pixels of movement before it counts as a drag
-
-			NeverLose:AddSignal(IconRoot.InputBegan:Connect(function(input)
-				if input.UserInputType ~= Enum.UserInputType.MouseButton1
-				and input.UserInputType ~= Enum.UserInputType.Touch then
-					return;
-				end;
-
-				dragging  = false;
-				dragStart = input.Position;
-				startPos  = IconRoot.Position;
-
-				local moved = false;
-				local moveConn, endConn;
-
-				moveConn = UserInputService.InputChanged:Connect(function(mv)
-					if mv.UserInputType ~= Enum.UserInputType.MouseMovement
-					and mv.UserInputType ~= Enum.UserInputType.Touch then return; end;
-
-					local delta = mv.Position - dragStart;
-					if delta.Magnitude > DRAG_THRESHOLD and MenuIconLib._draggable then
-						moved    = true;
-						dragging = true;
-						local raw = UDim2.new(
-							startPos.X.Scale, startPos.X.Offset + delta.X,
-							startPos.Y.Scale, startPos.Y.Offset + delta.Y
-						);
-						IconRoot.Position = clampPosition(raw);
-					end;
-				end);
-
-				endConn = input.Changed:Connect(function()
-					if input.UserInputState ~= Enum.UserInputState.End then return; end;
-					moveConn:Disconnect();
-					endConn:Disconnect();
-					dragging = false;
-
-					-- Pure tap (no drag movement) → fire the real-time keybind
-					if not moved then
-						NeverLose:FireKeybind();
-					end;
-				end);
-			end));
-		end;
-
-	-- ── Theme live-update ─────────────────────────────────────────
-	NeverLose:OnThemeChanged(function(theme)
-		if theme.Icon then
-			MenuIconLib:SetIconColor(theme.Icon);
-		end;
-		if theme.Accent then
-			MenuIconLib:SetStrokeColor(theme.Accent);
-		end;
-	end);
-
-	-- ── Settings panel (built-in, opens on right-click / long press) ─
-	-- Shows size slider + color pickers inline using the existing windows
-	-- (lightweight stub; a full window.UserSettings section is the preferred path)
-
-	-- Show by default (caller can call :SetVisible(false) to hide)
-	_setIconVisible(true);
-
-	return MenuIconLib;
-end;
-
 if getcustomasset then
 	local link = "https://github.com/4lpaca-pin/NeverLose/blob/main/assets/%s?raw=true";
 	local dir = 'NLAssets';
@@ -710,17 +323,6 @@ do
 			return string.char(c)
 		end))
 	end);
-end;
-
--- ── FireKeybind ───────────────────────────────────────────────────
--- Simulates the UI keybind being pressed in real time.
--- Reads Window.Keybind at call time, so it always matches whatever
--- the user has set — even if they changed it via the keybind picker.
--- Called by Watermark bindable blocks and the MenuIcon click.
-function NeverLose:FireKeybind()
-	if NeverLose.ActiveWindow then
-		NeverLose.ActiveWindow:ToggleInterface();
-	end;
 end;
 
 NeverLose.LoadIcon = LPH_NO_VIRTUALIZE(function()
@@ -1521,29 +1123,6 @@ end);
 
 local EmptyFunction = function() end;
 
--- ── CaseInsensitive ───────────────────────────────────────────────
--- Wraps any table so its methods can be called with any casing.
--- e.g. :AddButton(), :ADDBUTTON(), :adDbUtToN() all work.
--- Walks the raw table first (exact match), then falls back to a
--- lowercase scan so performance is fine for small method tables.
-local function CaseInsensitive(t)
-	return setmetatable(t, {
-		__index = function(self, key)
-			-- 1. exact key already present (fastest path, covers normal calls)
-			local v = rawget(self, key);
-			if v ~= nil then return v; end;
-
-			-- 2. lowercase scan
-			local lower = string.lower(tostring(key));
-			for k, val in next, self do
-				if string.lower(tostring(k)) == lower then
-					return val;
-				end;
-			end;
-		end;
-	});
-end;
-
 function NeverLose:RollingEffect(parent)
 	local UIGradient = Instance.new("UIGradient")
 
@@ -2264,7 +1843,7 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 			NeverLose.Flags[Config.Flag] = ToggleLib;
 		end;
 
-		return CaseInsensitive(ToggleLib);
+		return ToggleLib;
 	end;
 
 	function handle:AddSlider(Config)
@@ -2591,7 +2170,7 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 			NeverLose.Flags[Config.Flag] = SliderLib;
 		end;
 
-		return CaseInsensitive(SliderLib);
+		return SliderLib;
 	end;
 
 	function handle:AddOption(GearIcon)
@@ -2690,7 +2269,7 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 			})
 		end)));
 
-		return CaseInsensitive(Window);
+		return Window;
 	end;
 
 	function handle:AddColorPicker(Config)
@@ -2719,6 +2298,7 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 		ColorPicker.ClipsDescendants = true
 		ColorPicker.Size = UDim2.new(0, 18, 0, 18)
 		ColorPicker.ZIndex = ZINdex + 13
+		ColorPicker.LayoutOrder = -(#Handler:GetChildren() + 5);
 
 		UICorner.CornerRadius = UDim.new(0, 4)
 		UICorner.Parent = ColorPicker
@@ -2817,7 +2397,7 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 			NeverLose.Flags[Config.Flag] = ColorPickerLib;
 		end;
 
-		return CaseInsensitive(ColorPickerLib);
+		return ColorPickerLib;
 	end;
 
 	function handle:AddKeybind(Config)
@@ -2843,6 +2423,7 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 		Keybind.ClipsDescendants = true
 		Keybind.Size = UDim2.new(0, 45, 0, 18)
 		Keybind.ZIndex = ZINdex + 13
+		Keybind.LayoutOrder = -(#Handler:GetChildren() + 5);
 
 		UICorner.CornerRadius = UDim.new(0, 4)
 		UICorner.Parent = Keybind
@@ -2969,7 +2550,7 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 			NeverLose.Flags[Config.Flag] = KeybindLib;
 		end;
 
-		return CaseInsensitive(KeybindLib);
+		return KeybindLib;
 	end;
 
 	function handle:AddTextInput(Config)
@@ -2997,6 +2578,7 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 		TextInput.ClipsDescendants = true
 		TextInput.Size = UDim2.new(0, Config.Size, 0, 18)
 		TextInput.ZIndex = ZINdex + 13
+		TextInput.LayoutOrder = -(#Handler:GetChildren() + 5);
 
 		UICorner.CornerRadius = UDim.new(0, 4)
 		UICorner.Parent = TextInput
@@ -3081,11 +2663,8 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 			NeverLose.Flags[Config.Flag] = TextBoxLib;
 		end;
 
-		return CaseInsensitive(TextBoxLib);
+		return TextBoxLib;
 	end;
-
-	-- Alias: :AddInput() → same as :AddTextInput()
-	handle.AddInput = handle.AddTextInput;
 
 	function handle:AddDropdown(Config)
 		Config = NeverLose:ProcessParams(Config , {
@@ -3114,6 +2693,7 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 		Dropdown.ClipsDescendants = true
 		Dropdown.Size = UDim2.new(0, Config.Size, 0, 18)
 		Dropdown.ZIndex = ZINdex + 13
+		Dropdown.LayoutOrder = -(#Handler:GetChildren() + 5);
 
 		DropdownIcon.Name = NeverLose.RandomString();
 		DropdownIcon.Parent = Dropdown
@@ -3578,10 +3158,10 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 			NeverLose.Flags[Config.Flag] = DropdownLib;
 		end;
 
-		return CaseInsensitive(DropdownLib);
+		return DropdownLib;
 	end;
 
-	return CaseInsensitive(handle);
+	return handle;
 end;
 
 NeverLose.ProcessDropdown = LPH_NO_VIRTUALIZE(function(value)
@@ -3976,7 +3556,7 @@ function NeverLose:RegisiterItem(Frame: Frame , Signel)
 		handle.SetRender(Signel:GetValue());
 		Signel:Connect(handle.SetRender);
 
-		return CaseInsensitive(handle);
+		return handle;
 	end;
 
 	function idx:AddButton(Config)
@@ -4118,7 +3698,7 @@ function NeverLose:RegisiterItem(Frame: Frame , Signel)
 		Button.SetRender(Signel:GetValue())
 		Signel:Connect(Button.SetRender);
 
-		return CaseInsensitive(Button);
+		return Button;
 	end;
 
 	function idx:AddUserFrame(Name : string , Profile: string , Expires : string)
@@ -4252,10 +3832,10 @@ function NeverLose:RegisiterItem(Frame: Frame , Signel)
 			UserStatusLabel.Text = Exp or 'Never';
 		end;
 
-		return CaseInsensitive(UserFrameItem);
+		return UserFrameItem;
 	end;
 
-	return CaseInsensitive(idx);
+	return idx;
 end;
 
 function NeverLose:CreateWindow(Config)
@@ -4266,7 +3846,7 @@ function NeverLose:CreateWindow(Config)
 		Size = UDim2.new(0, 640, 0, 480),
 		ConfigFolder = "NeverLoseConfigs",
 		Enable3DRenderer = false,
-		Keybind = "RightControl"
+		Keybind = "Insert"
 	});
 
 	local Window = {
@@ -4840,7 +4420,7 @@ function NeverLose:CreateWindow(Config)
 	ConfigIcon.Size = UDim2.new(0, 25, 0, 25)
 	ConfigIcon.ZIndex = 9
 	ConfigIcon.FontFace = NeverLose.BuiltInBold
-	ConfigIcon.Text = "pencil-square"
+	ConfigIcon.Text = "floppy-disk"
 	ConfigIcon.TextColor3 = Color3.fromRGB(223, 223, 223)
 	ConfigIcon.TextSize = 16.000
 	ConfigIcon.TextTransparency = 0.250
@@ -5497,10 +5077,10 @@ function NeverLose:CreateWindow(Config)
 			Section.SetRender(Tab.Signal:GetValue());
 			Tab.Signal:Connect(Section.SetRender);
 
-			return CaseInsensitive(Section);
+			return Section;
 		end;
 
-		return CaseInsensitive(Tab);
+		return Tab;
 	end;
 
 	function Window:_InitConfig()
@@ -6337,9 +5917,6 @@ function NeverLose:CreateWindow(Config)
 		end;
 	end;
 
-	-- Register this window as the active window so bindables can fire it
-	NeverLose.ActiveWindow = Window;
-
 	function Window:Watermark()
 		if NeverLose.__WatermarkCache then
 			return NeverLose.__WatermarkCache;
@@ -6359,7 +5936,6 @@ function NeverLose:CreateWindow(Config)
 		Watermark.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		Watermark.BorderSizePixel = 0
 		Watermark.ClipsDescendants = true
-		Watermark.Active = true   -- required: allows child ImageButtons to receive clicks
 		Watermark.Position = UDim2.new(1, -10, 0, 10)
 		Watermark.Size = UDim2.new(0, 120, 0, 30)
 		Watermark.ZIndex = 16
@@ -6440,9 +6016,7 @@ function NeverLose:CreateWindow(Config)
 			Frame.BackgroundTransparency = 1.000
 			Frame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 			Frame.BorderSizePixel = 0
-			Frame.Active = true   -- required: allows child ImageButton to receive clicks
 			Frame.Size = UDim2.new(0, 50, 0, 30)
-			Frame.ZIndex = 17  -- must be >= Content/Icon ZIndex so CreateInput button (ZIndex+10=27) sits on top
 
 			Content.Name = NeverLose.RandomString();
 			Content.Parent = Frame
@@ -6536,68 +6110,20 @@ function NeverLose:CreateWindow(Config)
 			end;
 
 			function InnerBlock:Input(func)
-				-- If caller passes a function, use it.
-				-- If nil, default to firing the real-time keybind toggle.
-				local handler = func or function()
-					NeverLose:FireKeybind();
-				end;
+				local c,s = NeverLose:CreateInput(Frame,func);
 
-				local btn, signal = NeverLose:CreateInput(Frame, handler);
-				btn.Active = true;
-				btn.ZIndex = Frame.ZIndex + 10;
-				return signal;
+				return s;
 			end;
 
-			return CaseInsensitive(InnerBlock);
+			return InnerBlock;
 		end;
 
-		return CaseInsensitive(Watermark_lb);
+		return Watermark_lb;
 	end;
 
 	Window:SetRender(false);
 
-	-- ── Icon Settings (built-in UserSettings section) ─────────────
-	-- Called automatically if a MenuIcon was created before this window.
-	-- Adds: Icon Size slider, Draggable toggle, Icon Colour picker.
-	function Window:_RegisterMenuIconSettings(MenuIcon)
-		if not MenuIcon then return; end;
-
-		Window.UserSettings:AddLabel('Icon Size'):AddSlider({
-			Min      = 32,
-			Max      = 96,
-			Default  = MenuIcon._size,
-			Rounding = 0,
-			Type     = "px",
-			Size     = 100,
-			Callback = function(v)
-				MenuIcon:SetSize(v);
-			end,
-		});
-
-		Window.UserSettings:AddLabel('Icon Draggable'):AddToggle({
-			Default  = MenuIcon._draggable,
-			Callback = function(v)
-				MenuIcon:SetDraggable(v);
-			end,
-		});
-	end;
-
-	-- Patch ToggleInterface to pulse the MenuIcon if one is registered
-	local _orig_Toggle = Window.ToggleInterface;
-	function Window:ToggleInterface()
-		_orig_Toggle(self);
-		if Window._MenuIcon then
-			Window._MenuIcon:OnWindowToggle(Window.Signal:GetValue());
-		end;
-	end;
-
-	-- Convenience: attach a MenuIcon to this window
-	function Window:AttachMenuIcon(MenuIcon)
-		Window._MenuIcon = MenuIcon;
-		Window:_RegisterMenuIconSettings(MenuIcon);
-	end;
-
-	return CaseInsensitive(Window);
+	return Window;
 end;
 
 function NeverLose:CreateNotification()
@@ -6942,7 +6468,7 @@ function NeverLose:CreateLogger()
 		end))
 	end;
 
-	return CaseInsensitive(Logging)
+	return Logging
 end;
 
 function NeverLose:CreateIndicator()
@@ -7147,10 +6673,10 @@ function NeverLose:CreateIndicator()
 			Indicator.Update();
 		end;
 
-		return CaseInsensitive(Indicator);
+		return Indicator;
 	end;
 
-	return CaseInsensitive(Indicators);
+	return Indicators;
 end;
 
 function NeverLose:Unload()
